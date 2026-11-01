@@ -21,7 +21,10 @@ import {
   Camera,
   Image as ImageIcon,
   Trash2,
-  Maximize2
+  Maximize2,
+  ShieldCheck,
+  Flame,
+  Check
 } from 'lucide-react';
 import { IssueReport, IssueReportType } from '../domain/types';
 
@@ -43,9 +46,9 @@ interface FeedbackModalProps {
 }
 
 /**
- * Client-side screenshot compressor
- * Scales down to max 1000px and compresses to JPEG 0.65 quality.
- * Result is ~25 KB to 45 KB, fitting easily in Firestore and free storage.
+ * Client-Side Screenshot Compression (No Cloud Required)
+ * Scales image to max 1000px and compresses to lightweight JPEG.
+ * Output is ~25 KB to 40 KB, perfectly stored directly in document state.
  */
 function compressImage(file: File | Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -97,7 +100,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   onSubmitReport,
   showToast
 }) => {
-  // Navigation Tabs: 'submit' (giving problems) vs 'community' (browsing problems & voting)
+  // Navigation Tabs: 'submit' (submit issue) vs 'community' (view community issues & voting)
   const [activeTab, setActiveTab] = useState<'submit' | 'community'>('submit');
 
   // Form State
@@ -164,7 +167,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
             try {
               const compressed = await compressImage(file);
               setScreenshot(compressed);
-              showToast('স্ক্রিনশট পেস্ট করা হয়েছে!');
+              showToast('Screenshot pasted from clipboard!');
             } catch (err) {
               console.warn('Paste image failed:', err);
             }
@@ -197,9 +200,9 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
     try {
       const compressed = await compressImage(file);
       setScreenshot(compressed);
-      showToast('স্ক্রিনশট সংযুক্ত হয়েছে!');
+      showToast('Screenshot attached successfully!');
     } catch (err) {
-      showToast('ছবি লোড করতে সমস্যা হয়েছে।');
+      showToast('Failed to load image.');
     } finally {
       if (e.target) e.target.value = '';
     }
@@ -212,7 +215,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
     const trimmedMsg = message.trim();
     if (trimmedMsg.length < 5) {
-      setValidationError('অনুগ্রহ করে অন্তত ৫ অক্ষরের বার্তা লিখুন (Please enter at least 5 characters).');
+      setValidationError('Please enter at least 5 characters describing the issue.');
       return;
     }
 
@@ -224,7 +227,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         (trimmedMsg.length > 50 ? `${trimmedMsg.substring(0, 47)}...` : trimmedMsg);
 
       const displayName = isAnonymous
-        ? 'বেনামী ব্যবহারকারী (Anonymous)'
+        ? 'Anonymous User'
         : submitterName.trim() || userName || 'EcO User';
 
       const newReport: IssueReport = {
@@ -255,11 +258,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       await onSubmitReport(newReport);
       resetForm();
       setIsSubmitting(false);
-      showToast('ধন্যবাদ! আপনার অভিযোগ সবার জন্য পোস্ট করা হয়েছে।');
+      showToast('Thank you! Your issue was posted to the community board.');
       setActiveTab('community');
     } catch (err: any) {
       setIsSubmitting(false);
-      setValidationError(err?.message || 'সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
+      setValidationError(err?.message || 'Failed to submit report. Please try again.');
     }
   };
 
@@ -326,7 +329,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         aria-modal="true"
       >
         <div className="w-full max-w-2xl bg-[#1A1C20] border border-[#3D4943]/60 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
-          {/* --- Header --- */}
+          {/* --- Header: Only the brand title is in Bangla as requested --- */}
           <div className="px-5 pt-4 pb-3 border-b border-[#3D4943]/40 bg-[#1E2024]/90 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-[#0C0E12] border border-[#73E3B4]/40 flex items-center justify-center text-[#73E3B4] shadow-sm">
@@ -342,7 +345,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-[#BCCAC1]">
-                  খোলামেলা অভিযোগ ও পরামর্শ জানান এবং অন্যদের মতামত ভোট করুন
+                  Submit issues, complaints, or feature suggestions and vote on community feedback
                 </p>
               </div>
             </div>
@@ -351,13 +354,13 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               type="button"
               onClick={handleClose}
               className="p-1.5 rounded-lg text-[#87948C] hover:text-[#E2E2E8] hover:bg-[#282A2E] transition-colors cursor-pointer"
-              aria-label="Close"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* --- Top Tab Switcher: Submit vs Community Feed --- */}
+          {/* --- Top Tab Switcher (English) --- */}
           <div className="px-5 pt-3 pb-2 bg-[#1A1C20] border-b border-[#3D4943]/30">
             <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#0C0E12] border border-[#3D4943]/40">
               <button
@@ -370,7 +373,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 }`}
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>অভিযোগ জানান (Submit Issue)</span>
+                <span>Submit Issue</span>
               </button>
 
               <button
@@ -383,7 +386,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 }`}
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>সব অভিযোগ ও সমস্যা</span>
+                <span>Community Issues & Feedback</span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#73E3B4]/20 text-[#73E3B4]">
                   {communityIssues.length}
                 </span>
@@ -392,7 +395,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           </div>
 
           {/* =========================================================================
-              TAB 1: STREAMLINED SUBMISSION (WITH INSTANT SCREENSHOT ATTACHMENT)
+              TAB 1: SUBMIT AN ISSUE (CLEAN, INTUITIVE FORM IN ENGLISH)
              ========================================================================= */}
           {activeTab === 'submit' && (
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
@@ -406,14 +409,14 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               {/* Step 1: Select Type */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider block">
-                  ১. সমস্যাটি কী ধরণের? (Category)
+                  1. Issue Category
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { id: 'bug' as const, labelBn: 'বাগ / ভুল হিসাব', labelEn: 'Bug', icon: Bug, color: 'text-[#FFB4AB]' },
-                    { id: 'idea' as const, labelBn: 'নতুন আইডিয়া', labelEn: 'Feature Idea', icon: Lightbulb, color: 'text-[#FACC15]' },
-                    { id: 'complaint' as const, labelBn: 'অভিযোগ', labelEn: 'Complaint', icon: AlertCircle, color: 'text-[#FB923C]' },
-                    { id: 'other' as const, labelBn: 'সাধারণ মন্তব্য', labelEn: 'General', icon: HelpCircle, color: 'text-[#73E3B4]' }
+                    { id: 'bug' as const, label: 'Bug / Error', desc: 'Broken feature or math', icon: Bug, color: 'text-[#FFB4AB]' },
+                    { id: 'idea' as const, label: 'Feature Idea', desc: 'New suggestions', icon: Lightbulb, color: 'text-[#FACC15]' },
+                    { id: 'complaint' as const, label: 'Complaint', desc: 'Workflow frustration', icon: AlertCircle, color: 'text-[#FB923C]' },
+                    { id: 'other' as const, label: 'General', desc: 'Questions or notes', icon: HelpCircle, color: 'text-[#73E3B4]' }
                   ].map((item) => {
                     const Icon = item.icon;
                     const isSelected = reportType === item.id;
@@ -434,9 +437,9 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                         </div>
                         <div className="mt-2">
                           <div className={`font-bold text-xs ${isSelected ? 'text-[#E2E2E8]' : 'text-[#BCCAC1]'}`}>
-                            {item.labelBn}
+                            {item.label}
                           </div>
-                          <div className="text-[10px] text-[#87948C]">{item.labelEn}</div>
+                          <div className="text-[10px] text-[#87948C]">{item.desc}</div>
                         </div>
                       </button>
                     );
@@ -447,13 +450,13 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               {/* Step 2: Title */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider block">
-                  ২. সংক্ষেপে সমস্যার নাম (Short Title)
+                  2. Short Title
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. bKash cashout fee balance mismatch, mobile touch delay..."
+                  placeholder="e.g. bKash cashout fee calculation mismatch, mobile touch delay..."
                   className="w-full bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl px-3.5 py-2.5 text-xs text-[#E2E2E8] placeholder-[#87948C]/70 focus:outline-none focus:border-[#73E3B4] transition-colors"
                 />
               </div>
@@ -462,7 +465,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider">
-                    ৩. বিস্তারিত কী সমস্যা হয়েছে? (Details) <span className="text-[#FFB4AB]">*</span>
+                    3. Detailed Description <span className="text-[#FFB4AB]">*</span>
                   </label>
                   <span className="text-[10px] font-mono text-[#87948C]">
                     {message.length}/1000
@@ -476,20 +479,21 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   }}
                   rows={4}
                   maxLength={1000}
-                  placeholder="খোলামেলা লিখুন—কোনটা ঠিক কাজ করেনি, কেমন অভিজ্ঞতা হয়েছে বা আপনি কেমন সমাধান চান..."
+                  placeholder="Explain what happened, what went wrong, or what improvement you would like to see..."
                   className="w-full bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl p-3.5 text-xs text-[#E2E2E8] placeholder-[#87948C]/70 focus:outline-none focus:border-[#73E3B4] transition-colors resize-none leading-relaxed"
                 />
               </div>
 
-              {/* Step 4: Screenshot Attachment (100% Free Client-Side Compression & Storage) */}
+              {/* Step 4: Screenshot Attachment (100% Client-Side Compression — No Cloud Required) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider flex items-center gap-1.5">
                     <Camera className="w-3.5 h-3.5 text-[#73E3B4]" />
-                    <span>৪. স্ক্রিনশট সংযুক্ত করুন (Attach Screenshot — Optional)</span>
+                    <span>4. Attach Screenshot (Optional)</span>
                   </label>
-                  <span className="text-[10px] text-[#73E3B4] font-medium">
-                    100% Free (Auto-compressed)
+                  <span className="text-[10px] text-[#73E3B4] font-medium flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>Zero Cloud Storage Cost (Auto-compressed)</span>
                   </span>
                 </div>
 
@@ -519,11 +523,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                       </div>
                       <div className="min-w-0 text-xs">
                         <div className="font-semibold text-[#E2E2E8] flex items-center gap-1.5">
-                          <span>স্ক্রিনশট সংযুক্ত হয়েছে</span>
+                          <span>Screenshot attached</span>
                           <CheckCircle2 className="w-3.5 h-3.5 text-[#73E3B4]" />
                         </div>
                         <p className="text-[11px] text-[#87948C] truncate mt-0.5">
-                          ক্লিক করে বড় করে দেখুন বা পরিবর্তন করুন
+                          Click to view enlarged image or replace
                         </p>
                       </div>
                     </div>
@@ -534,7 +538,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                         onClick={() => fileInputRef.current?.click()}
                         className="px-2.5 py-1.5 rounded-lg bg-[#1E2024] hover:bg-[#282A2E] text-[#BCCAC1] hover:text-[#E2E2E8] text-xs transition-colors cursor-pointer"
                       >
-                        পাল্টান
+                        Change
                       </button>
                       <button
                         type="button"
@@ -557,10 +561,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                       </div>
                       <div>
                         <div className="font-semibold text-xs text-[#E2E2E8]">
-                          ছবি বা স্ক্রিনশট বেছে নিন
+                          Select image or drag & drop screenshot
                         </div>
                         <div className="text-[10px] text-[#87948C] mt-0.5">
-                          অথবা কীবোর্ড থেকে সরাসরি স্ক্রিনশট পেস্ট করুন (<kbd className="px-1 py-0.5 rounded bg-[#1E2024] text-[#BCCAC1]">Ctrl+V</kbd>)
+                          Or paste directly from clipboard anytime (<kbd className="px-1.5 py-0.5 rounded bg-[#1E2024] text-[#BCCAC1]">Ctrl+V</kbd>)
                         </div>
                       </div>
                     </div>
@@ -575,7 +579,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
                   <label className="text-[10px] font-semibold text-[#87948C] uppercase tracking-wider block mb-1">
-                    অ্যাপের কোন সেকশন? (App Section)
+                    Related App Section
                   </label>
                   <select
                     value={selectedSection}
@@ -584,23 +588,23 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   >
                     <option value="Home">Home / Dashboard</option>
                     <option value="Ledger History">Ledger History</option>
-                    <option value="Wallets">Wallets & Cash/bKash</option>
+                    <option value="Wallets">Wallets & Accounts</option>
                     <option value="People & Debts">People & Debts</option>
                     <option value="Stats">Financial Statistics</option>
                     <option value="Settings">Settings & Backup</option>
-                    <option value="Other">অন্যান্য (Other)</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="text-[10px] font-semibold text-[#87948C] uppercase tracking-wider block mb-1">
-                    আপনার নাম (Submitter)
+                    Your Name
                   </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
                       disabled={isAnonymous}
-                      value={isAnonymous ? 'গোপন রাখা হয়েছে' : submitterName}
+                      value={isAnonymous ? 'Anonymous User' : submitterName}
                       onChange={(e) => setSubmitterName(e.target.value)}
                       className="flex-1 bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl px-3 py-2 text-xs text-[#E2E2E8] disabled:opacity-50 disabled:text-[#87948C] focus:border-[#73E3B4] outline-none"
                     />
@@ -611,7 +615,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                         onChange={(e) => setIsAnonymous(e.target.checked)}
                         className="rounded border-[#3D4943] text-[#55C79A] focus:ring-0"
                       />
-                      <span>বেনামী</span>
+                      <span>Anonymous</span>
                     </label>
                   </div>
                 </div>
@@ -624,7 +628,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   onClick={() => setActiveTab('community')}
                   className="text-xs text-[#87948C] hover:text-[#73E3B4] transition-colors flex items-center gap-1 cursor-pointer"
                 >
-                  <span>আগের অভিযোগগুলো দেখুন</span>
+                  <span>Explore community issues</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
 
@@ -635,7 +639,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     disabled={isSubmitting}
                     className="px-4 py-2 rounded-xl bg-[#282A2E] hover:bg-[#3D4943]/60 text-[#BCCAC1] hover:text-[#E2E2E8] text-xs transition-colors cursor-pointer"
                   >
-                    বাতিল
+                    Cancel
                   </button>
 
                   <button
@@ -644,11 +648,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     className="px-5 py-2.5 rounded-xl bg-[#55C79A] hover:bg-[#73E3B4] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed text-[#003826] font-bold text-xs flex items-center gap-2 transition-all shadow-md cursor-pointer"
                   >
                     {isSubmitting ? (
-                      <span>জমা হচ্ছে...</span>
+                      <span>Submitting...</span>
                     ) : (
                       <>
                         <Send className="w-3.5 h-3.5" />
-                        <span>অভিযোগ জমা দিন</span>
+                        <span>Submit Issue</span>
                       </>
                     )}
                   </button>
@@ -658,7 +662,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           )}
 
           {/* =========================================================================
-              TAB 2: COMMUNITY ISSUES BOARD (WITH SCREENSHOT LIGHTBOX & PUBLIC VOTES)
+              TAB 2: COMMUNITY ISSUES BOARD (ENGLISH WITH VISUAL CARDS & VOTING)
              ========================================================================= */}
           {activeTab === 'community' && (
             <div className="flex-1 overflow-y-auto p-5 space-y-3.5 text-xs">
@@ -671,7 +675,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                       type="text"
                       value={communitySearch}
                       onChange={(e) => setCommunitySearch(e.target.value)}
-                      placeholder="Search community issues or complaints..."
+                      placeholder="Search community issues, bugs, or suggestions..."
                       className="w-full pl-9 pr-7 py-2 bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl text-xs text-[#E2E2E8] placeholder-[#87948C] focus:outline-none focus:border-[#73E3B4]"
                     />
                     {communitySearch && (
@@ -691,19 +695,19 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     onChange={(e) => setCommunitySort(e.target.value as 'hot' | 'recent')}
                     className="px-3 py-2 bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl text-xs text-[#E2E2E8] focus:border-[#73E3B4] outline-none cursor-pointer"
                   >
-                    <option value="hot">🔥 জনপ্রিয় (Most Voted)</option>
-                    <option value="recent">⏱️ নতুনতম (Recent)</option>
+                    <option value="hot">🔥 Most Voted</option>
+                    <option value="recent">⏱️ Newest First</option>
                   </select>
                 </div>
 
                 {/* Type Filter Pills */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
                   {[
-                    { id: 'all', label: 'সবগুলো (All)' },
-                    { id: 'bug', label: 'বাগ / সমস্যা' },
-                    { id: 'idea', label: 'আইডিয়া / ফিচার' },
-                    { id: 'complaint', label: 'অভিযোগ' },
-                    { id: 'other', label: 'অন্যান্য' }
+                    { id: 'all', label: 'All Issues' },
+                    { id: 'bug', label: 'Bugs & Errors' },
+                    { id: 'idea', label: 'Feature Ideas' },
+                    { id: 'complaint', label: 'Complaints' },
+                    { id: 'other', label: 'General' }
                   ].map((chip) => {
                     const isActive = communityTypeFilter === chip.id;
                     return (
@@ -728,7 +732,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               <div className="space-y-3">
                 {filteredCommunityIssues.length === 0 ? (
                   <div className="p-10 text-center text-xs text-[#87948C] bg-[#0C0E12] rounded-xl border border-[#3D4943]/30 space-y-2">
-                    <div>কোনো অভিযোগ বা সমস্যা খুঁজে পাওয়া যায়নি।</div>
+                    <div>No community issues found matching your criteria.</div>
                     <button
                       type="button"
                       onClick={() => {
@@ -737,7 +741,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                       }}
                       className="text-[#73E3B4] hover:underline cursor-pointer"
                     >
-                      ফিল্টার রিসেট করুন
+                      Clear search filters
                     </button>
                   </div>
                 ) : (
@@ -823,10 +827,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                               />
                               <div className="text-left">
                                 <div className="text-[11px] font-medium text-[#E2E2E8] group-hover:text-[#73E3B4] flex items-center gap-1 transition-colors">
-                                  <span>স্ক্রিনশট দেখুন</span>
+                                  <span>View Screenshot</span>
                                   <Maximize2 className="w-3 h-3" />
                                 </div>
-                                <div className="text-[10px] text-[#87948C]">ছবি বড় করে দেখুন</div>
+                                <div className="text-[10px] text-[#87948C]">Click to enlarge</div>
                               </div>
                             </div>
                           </div>
@@ -871,12 +875,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                             {issue.status === 'fixed' ? (
                               <span className="text-[#73E3B4] font-medium flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>সমাধান হয়েছে</span>
+                                <span>Resolved</span>
                               </span>
                             ) : issue.status === 'seen' ? (
-                              <span className="text-[#FACC15] font-medium">পর্যালোচনায় আছে</span>
+                              <span className="text-[#FACC15] font-medium">Under Review</span>
                             ) : (
-                              <span>জমা দেওয়া হয়েছে</span>
+                              <span>Submitted</span>
                             )}
                           </div>
                         </div>
@@ -894,7 +898,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E2024] hover:bg-[#282A2E] border border-[#73E3B4]/40 text-[#73E3B4] text-xs font-semibold transition-all cursor-pointer shadow-sm"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
-                  <span>আপনারও কি কোনো সমস্যা আছে? নতুন অভিযোগ জমা দিন</span>
+                  <span>Have an issue or idea? Submit a New Issue</span>
                 </button>
               </div>
             </div>
@@ -910,7 +914,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         >
           <div className="relative max-w-4xl max-h-[90vh] bg-[#111317] border border-[#3D4943]/80 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
             <div className="p-3 bg-[#1A1C20] border-b border-[#3D4943]/40 flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#E2E2E8]">স্ক্রিনশট প্রিভিউ (Screenshot Preview)</span>
+              <span className="text-xs font-semibold text-[#E2E2E8]">Screenshot Preview</span>
               <button
                 type="button"
                 onClick={() => setPreviewImage(null)}

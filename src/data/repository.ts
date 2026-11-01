@@ -37,6 +37,54 @@ import {
   where
 } from 'firebase/firestore';
 
+export const DEFAULT_COMMUNITY_ISSUES: IssueReport[] = [
+  {
+    id: 'issue_seed_1',
+    userId: 'user_community_seed_1',
+    userName: 'Tanvir Hossain',
+    title: 'bKash cash-out fee rate needs per-transaction override',
+    type: 'idea',
+    message: 'When cashing out from merchant vs agent, fee varies between 1.49% to 1.85%. An optional custom rate slider per transfer would make it 100% accurate.',
+    page: 'Wallets',
+    status: 'seen',
+    likesCount: 18,
+    dislikesCount: 1,
+    likedBy: [],
+    dislikedBy: [],
+    createdAt: Date.now() - 86400000 * 2
+  },
+  {
+    id: 'issue_seed_2',
+    userId: 'user_community_seed_2',
+    userName: 'Nabila Karim',
+    title: 'Monthly Category Breakdown Export in Excel / CSV',
+    type: 'idea',
+    message: 'I want to export each category total for the month (e.g. Food, Groceries, Rent) into an Excel spreadsheet or PDF for personal filing.',
+    page: 'Expenses',
+    status: 'new',
+    likesCount: 32,
+    dislikesCount: 0,
+    likedBy: [],
+    dislikedBy: [],
+    createdAt: Date.now() - 86400000 * 4
+  },
+  {
+    id: 'issue_seed_3',
+    userId: 'user_community_seed_3',
+    userName: 'Sakib Al Hasan',
+    title: 'Mobile touch target for calendar date picker on small screens',
+    type: 'bug',
+    message: 'On small screen devices, selecting dates at the bottom edge sometimes misses the tap. Making the hit area 44px would help.',
+    page: 'Home',
+    status: 'new',
+    likesCount: 11,
+    dislikesCount: 2,
+    likedBy: [],
+    dislikedBy: [],
+    createdAt: Date.now() - 86400000 * 6
+  }
+];
+
 export class HybridFirebaseRepository {
   private listeners: Set<() => void> = new Set();
   private unsubs: Unsubscribe[] = [];
@@ -60,9 +108,12 @@ export class HybridFirebaseRepository {
   private dismissedMilestones: Record<string, string[]> = {};
   private myConnectionCode: string = 'ECO-USER';
   private firstLaunchDone: boolean = false;
+  private communityIssues: IssueReport[] = [];
 
   constructor() {
     this.loadFromLocalStorageCache();
+    this.setupCommunityIssuesStream();
+
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (e) => {
         if (
@@ -859,8 +910,52 @@ export class HybridFirebaseRepository {
           this.proposals = Array.from(map.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         }
       } catch {}
+
+      const rawCommunity = localStorage.getItem('eco_community_issues');
+      if (rawCommunity) {
+        try {
+          this.communityIssues = JSON.parse(rawCommunity);
+        } catch {
+          this.communityIssues = [...DEFAULT_COMMUNITY_ISSUES];
+        }
+      } else {
+        this.communityIssues = [...DEFAULT_COMMUNITY_ISSUES];
+      }
     } catch (e) {
       console.warn('[EcO Cache] Failed to load local cache:', e);
+    }
+  }
+
+  private setupCommunityIssuesStream() {
+    if (typeof window === 'undefined') return;
+    if (isFirebaseConfigured() && db) {
+      try {
+        const unsub = onSnapshot(collection(db, 'communityIssues'), (snapshot) => {
+          if (!snapshot.empty) {
+            const list: IssueReport[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as IssueReport;
+              list.push({
+                ...data,
+                id: docSnap.id,
+                likesCount: typeof data.likesCount === 'number' ? data.likesCount : (data.likedBy?.length || 0),
+                dislikesCount: typeof data.dislikesCount === 'number' ? data.dislikesCount : (data.dislikedBy?.length || 0),
+                likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
+                dislikedBy: Array.isArray(data.dislikedBy) ? data.dislikedBy : []
+              });
+            });
+            list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            this.communityIssues = list;
+            localStorage.setItem('eco_community_issues', JSON.stringify(list));
+            this.notify();
+          }
+        }, (err) => {
+          console.warn('Community issues snapshot note:', err);
+        });
+        this.unsubs.push(unsub);
+      } catch (err) {
+        console.warn('Could not setup community issues stream:', err);
+      }
     }
   }
 
@@ -1791,14 +1886,125 @@ export class HybridFirebaseRepository {
     await this.updateProposal(updated);
   }
 
-  async saveIssueReport(report: IssueReport): Promise<void> {
-    if (isFirebaseConfigured() && db && this.activeUserId) {
-      try {
-        await this.setDocSafe(doc(db, 'users', this.activeUserId, 'issueReports', report.id), report);
-      } catch (err) {
-        console.warn('Could not post issue report:', err);
+  getCommunityIssues(): IssueReport[] {
+    if (this.communityIssues.length === 0) {
+      const raw = localStorage.getItem('eco_community_issues');
+      if (raw) {
+        try {
+          this.communityIssues = JSON.parse(raw);
+        } catch {
+          this.communityIssues = [...DEFAULT_COMMUNITY_ISSUES];
+        }
+      } else {
+        this.communityIssues = [...DEFAULT_COMMUNITY_ISSUES];
       }
     }
+    return [...this.communityIssues];
+  }
+
+  async saveIssueReport(report: IssueReport): Promise<void> {
+    const enrichedReport: IssueReport = {
+      ...report,
+      userName: report.userName || this.userDisplayName || 'Anonymous User',
+      likesCount: typeof report.likesCount === 'number' ? report.likesCount : 0,
+      dislikesCount: typeof report.dislikesCount === 'number' ? report.dislikesCount : 0,
+      likedBy: Array.isArray(report.likedBy) ? report.likedBy : [],
+      dislikedBy: Array.isArray(report.dislikedBy) ? report.dislikedBy : []
+    };
+
+    // Update in-memory list and local storage cache
+    this.communityIssues = [
+      enrichedReport,
+      ...this.communityIssues.filter((i) => i.id !== enrichedReport.id)
+    ];
+    localStorage.setItem('eco_community_issues', JSON.stringify(this.communityIssues));
+    this.notify();
+
+    // Persist to user's private copy if signed in
+    if (isFirebaseConfigured() && db && this.activeUserId) {
+      try {
+        await this.setDocSafe(doc(db, 'users', this.activeUserId, 'issueReports', report.id), enrichedReport);
+      } catch (err) {
+        console.warn('Could not post private issue report:', err);
+      }
+    }
+
+    // Persist to public community issues collection
+    if (isFirebaseConfigured() && db) {
+      try {
+        await this.setDocSafe(doc(db, 'communityIssues', report.id), enrichedReport);
+      } catch (err) {
+        console.warn('Could not post public community issue report:', err);
+      }
+    }
+  }
+
+  async voteIssue(
+    issueId: string,
+    voteType: 'like' | 'dislike',
+    voterId: string
+  ): Promise<{ likes: number; dislikes: number; userVote: 'like' | 'dislike' | null }> {
+    const issue = this.communityIssues.find((i) => i.id === issueId);
+    if (!issue) {
+      return { likes: 0, dislikes: 0, userVote: null };
+    }
+
+    const likedSet = new Set(issue.likedBy || []);
+    const dislikedSet = new Set(issue.dislikedBy || []);
+    let userVote: 'like' | 'dislike' | null = null;
+
+    if (voteType === 'like') {
+      if (likedSet.has(voterId)) {
+        // Toggle off (unvote)
+        likedSet.delete(voterId);
+        userVote = null;
+      } else {
+        // Vote like (and cancel dislike if previously disliked)
+        likedSet.add(voterId);
+        dislikedSet.delete(voterId);
+        userVote = 'like';
+      }
+    } else if (voteType === 'dislike') {
+      if (dislikedSet.has(voterId)) {
+        // Toggle off (unvote)
+        dislikedSet.delete(voterId);
+        userVote = null;
+      } else {
+        // Vote dislike (and cancel like if previously liked)
+        dislikedSet.add(voterId);
+        likedSet.delete(voterId);
+        userVote = 'dislike';
+      }
+    }
+
+    issue.likedBy = Array.from(likedSet);
+    issue.dislikedBy = Array.from(dislikedSet);
+    issue.likesCount = issue.likedBy.length;
+    issue.dislikesCount = issue.dislikedBy.length;
+
+    // Save to local cache
+    localStorage.setItem('eco_community_issues', JSON.stringify(this.communityIssues));
+    this.notify();
+
+    // Persist merge update to public Firestore collection
+    if (isFirebaseConfigured() && db) {
+      try {
+        await this.setDocSafe(doc(db, 'communityIssues', issue.id), {
+          likesCount: issue.likesCount,
+          dislikesCount: issue.dislikesCount,
+          likedBy: issue.likedBy,
+          dislikedBy: issue.dislikedBy
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Could not persist issue vote:', err);
+      }
+    }
+
+    return {
+      likes: issue.likesCount,
+      dislikes: issue.dislikesCount,
+      userVote
+    };
   }
 
   // ============================================================================

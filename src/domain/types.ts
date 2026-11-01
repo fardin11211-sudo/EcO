@@ -212,17 +212,24 @@ export type IssueReportStatus = 'new' | 'seen' | 'fixed';
 export interface IssueReport {
   id: string;
   userId: string;
+  userName?: string;
   userEmail?: string;
+  title?: string;
   type: IssueReportType;
   message: string;
   page: string;
-  deviceContext: {
+  deviceContext?: {
     browser: string;
     screen: string;
     theme: string;
     version: string;
   };
-  contactPermission: boolean;
+  contactPermission?: boolean;
   status: IssueReportStatus;
+  likesCount?: number;
+  dislikesCount?: number;
+  likedBy?: string[];
+  dislikedBy?: string[];
   createdAt: number;
 }
+

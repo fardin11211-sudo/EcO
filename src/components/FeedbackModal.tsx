@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   X,
   Send,
-  MessageSquareHeart,
   Bug,
   Lightbulb,
   AlertCircle,
@@ -10,21 +9,14 @@ import {
   ThumbsUp,
   ThumbsDown,
   Search,
-  Filter,
   CheckCircle2,
-  Clock,
-  User,
   PlusCircle,
   MessageSquare,
-  Sparkles,
   ArrowRight,
   Camera,
   Image as ImageIcon,
   Trash2,
-  Maximize2,
-  ShieldCheck,
-  Flame,
-  Check
+  Maximize2
 } from 'lucide-react';
 import { IssueReport, IssueReportType } from '../domain/types';
 
@@ -46,29 +38,30 @@ interface FeedbackModalProps {
 }
 
 /**
- * Client-Side Screenshot Compression (No Cloud Required)
- * Scales image to max 1000px and compresses to lightweight JPEG.
- * Output is ~25 KB to 40 KB, perfectly stored directly in document state.
+ * Client-Side Screenshot Compression (Zero Cloud Required)
+ * Compresses an image to max 1000px and lightweight JPEG for storage.
  */
-function compressImage(file: File | Blob): Promise<string> {
+function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
+        const MAX_DIM = 1000;
         let width = img.width;
         let height = img.height;
-        const maxDim = 1000;
-        if (width > maxDim || height > maxDim) {
+
+        if (width > MAX_DIM || height > MAX_DIM) {
           if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
           } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
           }
         }
+
+        const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
@@ -76,6 +69,7 @@ function compressImage(file: File | Blob): Promise<string> {
           resolve(e.target?.result as string);
           return;
         }
+
         ctx.drawImage(img, 0, 0, width, height);
         const compressed = canvas.toDataURL('image/jpeg', 0.65);
         resolve(compressed);
@@ -100,7 +94,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   onSubmitReport,
   showToast
 }) => {
-  // Navigation Tabs: 'submit' (submit issue) vs 'community' (view community issues & voting)
+  // Navigation Tabs: 'submit' vs 'community'
   const [activeTab, setActiveTab] = useState<'submit' | 'community'>('submit');
 
   // Form State
@@ -160,21 +154,25 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
     const handlePaste = async (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
+
       for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
-          const file = items[i].getAsFile();
-          if (file) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const blob = item.getAsFile();
+          if (blob) {
             try {
-              const compressed = await compressImage(file);
+              const compressed = await compressImage(blob);
               setScreenshot(compressed);
-              showToast('Screenshot pasted from clipboard!');
+              showToast('Screenshot attached from clipboard.');
             } catch (err) {
-              console.warn('Paste image failed:', err);
+              console.error('Failed to compress pasted image:', err);
             }
           }
+          break;
         }
       }
     };
+
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
   }, [isOpen, activeTab, showToast]);
@@ -200,8 +198,8 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
     try {
       const compressed = await compressImage(file);
       setScreenshot(compressed);
-      showToast('Screenshot attached successfully!');
-    } catch (err) {
+      showToast('Screenshot attached.');
+    } catch {
       showToast('Failed to load image.');
     } finally {
       if (e.target) e.target.value = '';
@@ -209,22 +207,23 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   };
 
   // Submit Handler
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setValidationError(null);
 
-    const trimmedMsg = message.trim();
-    if (trimmedMsg.length < 5) {
-      setValidationError('Please enter at least 5 characters describing the issue.');
+    const cleanTitle = title.trim();
+    const cleanMsg = message.trim();
+
+    if (!cleanTitle && !cleanMsg) {
+      setValidationError('Please enter a title or describe the problem.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const generatedTitle =
-        title.trim() ||
-        (trimmedMsg.length > 50 ? `${trimmedMsg.substring(0, 47)}...` : trimmedMsg);
+      const finalTitle = cleanTitle || (cleanMsg.length > 50 ? `${cleanMsg.substring(0, 47)}...` : cleanMsg);
+      const finalMsg = cleanMsg || cleanTitle;
 
       const displayName = isAnonymous
         ? 'Anonymous User'
@@ -235,12 +234,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         userId: userId || voterId,
         userName: displayName,
         userEmail: isAnonymous ? undefined : userEmail,
-        title: generatedTitle,
+        title: finalTitle,
         type: reportType,
-        message: trimmedMsg,
+        message: finalMsg,
         page: selectedSection,
         deviceContext: {
-          browser: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown',
+          browser: typeof navigator !== 'undefined' ? navigator.userAgent : 'Browser',
           screen: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : 'N/A',
           theme: 'dark',
           version: 'v2.2'
@@ -261,6 +260,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       showToast('Thank you! Your issue was posted to the community board.');
       setActiveTab('community');
     } catch (err: any) {
+      console.error('Submission error:', err);
       setIsSubmitting(false);
       setValidationError(err?.message || 'Failed to submit report. Please try again.');
     }
@@ -303,50 +303,43 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       });
   }, [communityIssues, communityTypeFilter, communitySearch, communitySort]);
 
-  if (!isOpen) return null;
+  // Relative Time helper in English
+  const formatRelativeTime = (timestamp: number): string => {
+    const diff = Math.max(0, Date.now() - timestamp);
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
 
-  const formatRelativeTime = (timestamp: number) => {
-    const diffMs = Date.now() - timestamp;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHours = Math.floor(diffMin / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffDays > 0) return `${diffDays}d ago`;
-    if (diffHours > 0) return `${diffHours}h ago`;
-    if (diffMin > 0) return `${diffMin}m ago`;
-    return 'Just now';
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 30) return `${days}d ago`;
+    return new Date(timestamp).toLocaleDateString();
   };
+
+  if (!isOpen) return null;
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) handleClose();
-        }}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="w-full max-w-2xl bg-[#1A1C20] border border-[#3D4943]/60 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
-          {/* --- Header: Only the brand title is in Bangla as requested --- */}
-          <div className="px-5 pt-4 pb-3 border-b border-[#3D4943]/40 bg-[#1E2024]/90 flex items-center justify-between">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="relative w-full max-w-2xl bg-[#131518] border border-[#3D4943]/60 rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-[#E2E2E8]"
+        >
+          {/* --- Header (Title in Bangla, rest in English) --- */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#3D4943]/40 bg-[#1A1C20]">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#0C0E12] border border-[#73E3B4]/40 flex items-center justify-center text-[#73E3B4] shadow-sm">
-                <MessageSquareHeart className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-xl bg-[#55C79A]/15 border border-[#73E3B4]/30 flex items-center justify-center text-[#73E3B4]">
+                <Bug className="w-5 h-5" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-[#E2E2E8] tracking-tight">
-                    অ্যাপ রে গালাবো
-                  </h2>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#73E3B4]/15 text-[#73E3B4] font-semibold border border-[#73E3B4]/30">
-                    Community Hub
-                  </span>
-                </div>
-                <p className="text-[11px] text-[#BCCAC1]">
-                  Submit issues, complaints, or feature suggestions and vote on community feedback
-                </p>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-base sm:text-lg font-bold text-[#E2E2E8] tracking-tight">
+                  অ্যাপ রে গালাবো
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#73E3B4]/15 text-[#73E3B4] font-semibold border border-[#73E3B4]/30">
+                  Community Hub
+                </span>
               </div>
             </div>
 
@@ -386,7 +379,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 }`}
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Community Issues & Feedback</span>
+                <span>Community Issues</span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#73E3B4]/20 text-[#73E3B4]">
                   {communityIssues.length}
                 </span>
@@ -395,10 +388,16 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           </div>
 
           {/* =========================================================================
-              TAB 1: SUBMIT AN ISSUE (CLEAN, INTUITIVE FORM IN ENGLISH)
+              TAB 1: SUBMIT AN ISSUE (CLEAN, DIRECT FORM — NO PATRONIZING SUB-DESCRIPTIONS)
              ========================================================================= */}
           {activeTab === 'submit' && (
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+            <form
+              onSubmit={handleSubmit}
+              autoComplete="off"
+              spellCheck={false}
+              data-gramm="false"
+              className="flex-1 overflow-y-auto p-5 space-y-4 text-xs"
+            >
               {validationError && (
                 <div className="p-3 rounded-xl bg-[#FFB4AB]/10 border border-[#FFB4AB]/30 text-[#FFB4AB] text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -406,17 +405,17 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 </div>
               )}
 
-              {/* Step 1: Select Type */}
+              {/* Category Selector (Labels Only, No Sub-descriptions) */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider block">
-                  1. Issue Category
+                  Category
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { id: 'bug' as const, label: 'Bug / Error', desc: 'Broken feature or math', icon: Bug, color: 'text-[#FFB4AB]' },
-                    { id: 'idea' as const, label: 'Feature Idea', desc: 'New suggestions', icon: Lightbulb, color: 'text-[#FACC15]' },
-                    { id: 'complaint' as const, label: 'Complaint', desc: 'Workflow frustration', icon: AlertCircle, color: 'text-[#FB923C]' },
-                    { id: 'other' as const, label: 'General', desc: 'Questions or notes', icon: HelpCircle, color: 'text-[#73E3B4]' }
+                    { id: 'bug' as const, label: 'Bug / Error', icon: Bug, color: 'text-[#FFB4AB]' },
+                    { id: 'idea' as const, label: 'Feature Idea', icon: Lightbulb, color: 'text-[#FACC15]' },
+                    { id: 'complaint' as const, label: 'Complaint', icon: AlertCircle, color: 'text-[#FB923C]' },
+                    { id: 'other' as const, label: 'General', icon: HelpCircle, color: 'text-[#73E3B4]' }
                   ].map((item) => {
                     const Icon = item.icon;
                     const isSelected = reportType === item.id;
@@ -425,47 +424,50 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                         key={item.id}
                         type="button"
                         onClick={() => setReportType(item.id)}
-                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
                           isSelected
                             ? 'bg-[#1E2024] border-[#73E3B4] shadow-sm ring-1 ring-[#73E3B4]/40'
                             : 'bg-[#0C0E12] border-[#3D4943]/40 text-[#BCCAC1] hover:border-[#3D4943]/80'
                         }`}
                       >
-                        <div className="flex items-center justify-between w-full">
-                          <Icon className={`w-4 h-4 ${isSelected ? 'text-[#73E3B4]' : item.color}`} />
-                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#73E3B4]" />}
-                        </div>
-                        <div className="mt-2">
-                          <div className={`font-bold text-xs ${isSelected ? 'text-[#E2E2E8]' : 'text-[#BCCAC1]'}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Icon className={`w-4 h-4 shrink-0 ${isSelected ? 'text-[#73E3B4]' : item.color}`} />
+                          <span className={`font-semibold text-xs truncate ${isSelected ? 'text-[#E2E2E8]' : 'text-[#BCCAC1]'}`}>
                             {item.label}
-                          </div>
-                          <div className="text-[10px] text-[#87948C]">{item.desc}</div>
+                          </span>
                         </div>
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#73E3B4] shrink-0" />}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Step 2: Title */}
+              {/* Title */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider block">
-                  2. Short Title
+                  Title
                 </label>
                 <input
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. bKash cashout fee calculation mismatch, mobile touch delay..."
+                  autoComplete="off"
+                  spellCheck={false}
+                  data-gramm="false"
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    if (validationError) setValidationError(null);
+                  }}
+                  placeholder="e.g. Daily spending rate calculation, Ledger edit"
                   className="w-full bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl px-3.5 py-2.5 text-xs text-[#E2E2E8] placeholder-[#87948C]/70 focus:outline-none focus:border-[#73E3B4] transition-colors"
                 />
               </div>
 
-              {/* Step 3: Message / Details */}
+              {/* Description */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider">
-                    3. Detailed Description <span className="text-[#FFB4AB]">*</span>
+                    Description
                   </label>
                   <span className="text-[10px] font-mono text-[#87948C]">
                     {message.length}/1000
@@ -473,29 +475,26 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 </div>
                 <textarea
                   value={message}
+                  autoComplete="off"
+                  spellCheck={false}
+                  data-gramm="false"
                   onChange={(e) => {
                     setMessage(e.target.value);
                     if (validationError) setValidationError(null);
                   }}
                   rows={4}
                   maxLength={1000}
-                  placeholder="Explain what happened, what went wrong, or what improvement you would like to see..."
+                  placeholder="Describe what occurred, steps to reproduce, or expected behavior..."
                   className="w-full bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl p-3.5 text-xs text-[#E2E2E8] placeholder-[#87948C]/70 focus:outline-none focus:border-[#73E3B4] transition-colors resize-none leading-relaxed"
                 />
               </div>
 
-              {/* Step 4: Screenshot Attachment (100% Client-Side Compression — No Cloud Required) */}
+              {/* Screenshot Attachment */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider flex items-center gap-1.5">
-                    <Camera className="w-3.5 h-3.5 text-[#73E3B4]" />
-                    <span>4. Attach Screenshot (Optional)</span>
-                  </label>
-                  <span className="text-[10px] text-[#73E3B4] font-medium flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" />
-                    <span>Zero Cloud Storage Cost (Auto-compressed)</span>
-                  </span>
-                </div>
+                <label className="text-[11px] font-semibold text-[#BCCAC1] uppercase tracking-wider flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-[#73E3B4]" />
+                  <span>Attach Screenshot (Optional)</span>
+                </label>
 
                 <input
                   type="file"
@@ -510,11 +509,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     <div className="flex items-center gap-3 min-w-0">
                       <div
                         onClick={() => setPreviewImage(screenshot)}
-                        className="relative w-14 h-14 rounded-lg overflow-hidden border border-[#3D4943]/60 bg-black cursor-pointer group shrink-0"
+                        className="relative w-12 h-12 rounded-lg overflow-hidden border border-[#3D4943]/60 bg-black cursor-pointer group shrink-0"
                       >
                         <img
                           src={screenshot}
-                          alt="Attached Screenshot"
+                          alt="Screenshot"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -526,9 +525,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                           <span>Screenshot attached</span>
                           <CheckCircle2 className="w-3.5 h-3.5 text-[#73E3B4]" />
                         </div>
-                        <p className="text-[11px] text-[#87948C] truncate mt-0.5">
-                          Click to view enlarged image or replace
-                        </p>
                       </div>
                     </div>
 
@@ -553,33 +549,28 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-4 rounded-xl border border-dashed border-[#3D4943]/70 hover:border-[#73E3B4]/60 bg-[#0C0E12]/60 hover:bg-[#0C0E12] transition-colors cursor-pointer flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left"
+                    className="p-3.5 rounded-xl border border-dashed border-[#3D4943]/70 hover:border-[#73E3B4]/60 bg-[#0C0E12]/60 hover:bg-[#0C0E12] transition-colors cursor-pointer flex items-center justify-between gap-2.5"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#1E2024] border border-[#3D4943]/50 flex items-center justify-center text-[#73E3B4] shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-[#1E2024] border border-[#3D4943]/50 flex items-center justify-center text-[#73E3B4] shrink-0">
                         <ImageIcon className="w-4 h-4" />
                       </div>
-                      <div>
-                        <div className="font-semibold text-xs text-[#E2E2E8]">
-                          Select image or drag & drop screenshot
-                        </div>
-                        <div className="text-[10px] text-[#87948C] mt-0.5">
-                          Or paste directly from clipboard anytime (<kbd className="px-1.5 py-0.5 rounded bg-[#1E2024] text-[#BCCAC1]">Ctrl+V</kbd>)
-                        </div>
-                      </div>
+                      <span className="font-medium text-xs text-[#BCCAC1]">
+                        Select or paste screenshot
+                      </span>
                     </div>
                     <span className="px-3 py-1.5 rounded-lg bg-[#1E2024] text-[#73E3B4] font-medium text-xs whitespace-nowrap">
-                      Browse File
+                      Browse
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Step 5: Metadata (Page & Submitter) */}
+              {/* Section & Submitter */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
                   <label className="text-[10px] font-semibold text-[#87948C] uppercase tracking-wider block mb-1">
-                    Related App Section
+                    Related Section
                   </label>
                   <select
                     value={selectedSection}
@@ -644,8 +635,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
                   <button
                     type="submit"
-                    disabled={isSubmitting || message.trim().length < 5}
-                    className="px-5 py-2.5 rounded-xl bg-[#55C79A] hover:bg-[#73E3B4] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed text-[#003826] font-bold text-xs flex items-center gap-2 transition-all shadow-md cursor-pointer"
+                    onClick={(e) => {
+                      if (!isSubmitting) handleSubmit(e);
+                    }}
+                    disabled={isSubmitting}
+                    className="px-5 py-2.5 rounded-xl bg-[#55C79A] hover:bg-[#73E3B4] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed text-[#003826] font-bold text-xs flex items-center gap-2 transition-all shadow-md cursor-pointer"
                   >
                     {isSubmitting ? (
                       <span>Submitting...</span>
@@ -675,7 +669,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                       type="text"
                       value={communitySearch}
                       onChange={(e) => setCommunitySearch(e.target.value)}
-                      placeholder="Search community issues, bugs, or suggestions..."
+                      placeholder="Search community issues..."
                       className="w-full pl-9 pr-7 py-2 bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl text-xs text-[#E2E2E8] placeholder-[#87948C] focus:outline-none focus:border-[#73E3B4]"
                     />
                     {communitySearch && (
@@ -696,7 +690,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     className="px-3 py-2 bg-[#0C0E12] border border-[#3D4943]/50 rounded-xl text-xs text-[#E2E2E8] focus:border-[#73E3B4] outline-none cursor-pointer"
                   >
                     <option value="hot">🔥 Most Voted</option>
-                    <option value="recent">⏱️ Newest First</option>
+                    <option value="recent">⏱️ Newest</option>
                   </select>
                 </div>
 
@@ -731,9 +725,9 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               {/* List of Community Issues */}
               <div className="space-y-3">
                 {communityIssues.length === 0 ? (
-                  <div className="py-12 px-6 text-center rounded-2xl bg-[#0C0E12] border border-[#73E3B4]/30 space-y-3.5 shadow-sm">
-                    <div className="w-14 h-14 rounded-2xl bg-[#73E3B4]/15 border border-[#73E3B4]/40 flex items-center justify-center text-[#73E3B4] mx-auto shadow-md shadow-[#73E3B4]/10">
-                      <CheckCircle2 className="w-7 h-7 stroke-[2.2]" />
+                  <div className="py-12 px-6 text-center rounded-2xl bg-[#0C0E12] border border-[#73E3B4]/30 space-y-3 shadow-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-[#73E3B4]/15 border border-[#73E3B4]/40 flex items-center justify-center text-[#73E3B4] mx-auto shadow-md shadow-[#73E3B4]/10">
+                      <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
                     </div>
                     <div className="space-y-1">
                       <h3 className="text-2xl font-bold font-mono text-[#73E3B4] tracking-tight uppercase">
@@ -742,24 +736,21 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                       <p className="text-xs font-semibold text-[#E2E2E8]">
                         No issues reported — The app is working perfectly!
                       </p>
-                      <p className="text-[11px] text-[#87948C] max-w-sm mx-auto leading-relaxed">
-                        There are currently zero open problems or complaints. If you ever experience a bug or have a suggestion, feel free to report it.
-                      </p>
                     </div>
-                    <div className="pt-2">
+                    <div className="pt-1">
                       <button
                         type="button"
                         onClick={() => setActiveTab('submit')}
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E2024] hover:bg-[#282A2E] border border-[#73E3B4]/40 text-[#73E3B4] text-xs font-semibold transition-all cursor-pointer shadow-sm"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
-                        <span>Submit an Issue or Suggestion</span>
+                        <span>Submit Issue</span>
                       </button>
                     </div>
                   </div>
                 ) : filteredCommunityIssues.length === 0 ? (
-                  <div className="p-10 text-center text-xs text-[#87948C] bg-[#0C0E12] rounded-xl border border-[#3D4943]/30 space-y-2">
-                    <div>No issues match your search or filter.</div>
+                  <div className="p-8 text-center text-xs text-[#87948C] bg-[#0C0E12] rounded-xl border border-[#3D4943]/30 space-y-2">
+                    <div>No issues match your search filter.</div>
                     <button
                       type="button"
                       onClick={() => {
@@ -768,7 +759,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                       }}
                       className="text-[#73E3B4] hover:underline cursor-pointer"
                     >
-                      Clear search filters
+                      Clear search
                     </button>
                   </div>
                 ) : (
@@ -840,7 +831,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                           </p>
                         </div>
 
-                        {/* Attached Screenshot Thumbnail (if present) */}
+                        {/* Attached Screenshot Thumbnail */}
                         {issue.screenshot && (
                           <div className="pt-1">
                             <div
@@ -849,15 +840,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                             >
                               <img
                                 src={issue.screenshot}
-                                alt="Issue Attachment"
+                                alt="Attachment"
                                 className="w-10 h-10 rounded object-cover border border-black/40 group-hover:scale-105 transition-transform"
                               />
-                              <div className="text-left">
-                                <div className="text-[11px] font-medium text-[#E2E2E8] group-hover:text-[#73E3B4] flex items-center gap-1 transition-colors">
-                                  <span>View Screenshot</span>
-                                  <Maximize2 className="w-3 h-3" />
-                                </div>
-                                <div className="text-[10px] text-[#87948C]">Click to enlarge</div>
+                              <div className="text-left text-[11px] font-medium text-[#E2E2E8] group-hover:text-[#73E3B4] flex items-center gap-1 transition-colors">
+                                <span>Screenshot</span>
+                                <Maximize2 className="w-3 h-3" />
                               </div>
                             </div>
                           </div>
@@ -897,8 +885,8 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                             </button>
                           </div>
 
-                          {/* Status Note */}
-                          <div className="text-[10px] text-[#87948C] flex items-center gap-1">
+                          {/* Status */}
+                          <div className="text-[10px] text-[#87948C]">
                             {issue.status === 'fixed' ? (
                               <span className="text-[#73E3B4] font-medium flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
@@ -916,49 +904,33 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   })
                 )}
               </div>
-
-              {/* Quick CTA to submit a new problem */}
-              {communityIssues.length > 0 && (
-                <div className="pt-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('submit')}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E2024] hover:bg-[#282A2E] border border-[#73E3B4]/40 text-[#73E3B4] text-xs font-semibold transition-all cursor-pointer shadow-sm"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5" />
-                    <span>Have an issue or idea? Submit a New Issue</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Lightbox Preview Modal for Zooming Screenshots */}
+      {/* Full-Screen Image Lightbox Preview */}
       {previewImage && (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-150"
+          className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
           onClick={() => setPreviewImage(null)}
         >
-          <div className="relative max-w-4xl max-h-[90vh] bg-[#111317] border border-[#3D4943]/80 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
-            <div className="p-3 bg-[#1A1C20] border-b border-[#3D4943]/40 flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#E2E2E8]">Screenshot Preview</span>
-              <button
-                type="button"
-                onClick={() => setPreviewImage(null)}
-                className="p-1 rounded-lg text-[#87948C] hover:text-[#E2E2E8] cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-2 overflow-auto max-h-[82vh] flex items-center justify-center bg-black/50">
-              <img
-                src={previewImage}
-                alt="Enlarged Screenshot"
-                className="max-w-full max-h-[80vh] object-contain rounded-lg"
-              />
-            </div>
+          <div
+            className="relative max-w-4xl max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-10 right-0 p-1.5 rounded-full bg-[#1E2024] text-[#E2E2E8] hover:bg-[#282A2E] transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewImage}
+              alt="Enlarged screenshot"
+              className="max-w-full max-h-[85vh] rounded-xl object-contain border border-[#3D4943]/60 shadow-2xl"
+            />
           </div>
         </div>
       )}

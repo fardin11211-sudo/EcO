@@ -304,6 +304,10 @@
     "/users/{userId}/openingBalances/{balanceId}": {
       "schema": "OpeningBalances",
       "description": "User opening balance records"
+    },
+    "/communityIssues/{issueId}": {
+      "schema": "CommunityIssue",
+      "description": "Public community problems, bug reports, and suggestions with public upvotes and downvotes"
     }
   }
 }

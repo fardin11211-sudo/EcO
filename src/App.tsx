@@ -1053,7 +1053,11 @@ export default function App() {
           return res;
         }}
         onSubmitReport={async (report) => {
-          await repository.saveIssueReport(report);
+          try {
+            await repository.saveIssueReport(report);
+          } catch (err) {
+            console.warn('saveIssueReport warning:', err);
+          }
           setCommunityIssues(repository.getCommunityIssues());
         }}
         showToast={showToast}

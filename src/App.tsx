@@ -78,6 +78,7 @@ export default function App() {
   const [proposals, setProposals] = useState<EcOProposal[]>(() => repository.getProposals());
   const [dismissedMilestones, setDismissedMilestones] = useState<Record<string, string[]>>(() => repository.getDismissedMilestones());
   const [myConnectionCode, setMyConnectionCode] = useState<string>(() => repository.getMyConnectionCode());
+  const [communityIssues, setCommunityIssues] = useState<IssueReport[]>(() => repository.getCommunityIssues());
 
   // UI Navigation & Modals
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -150,6 +151,7 @@ export default function App() {
     setProposals(repository.getProposals());
     setDismissedMilestones(repository.getDismissedMilestones());
     setMyConnectionCode(repository.getMyConnectionCode());
+    setCommunityIssues(repository.getCommunityIssues());
   }, []);
 
   useEffect(() => {
@@ -1041,8 +1043,18 @@ export default function App() {
         isOpen={isFeedbackOpen}
         onClose={() => setIsFeedbackOpen(false)}
         currentPage={currentTab}
-        onSubmitReport={(report) => {
-          repository.saveIssueReport(report);
+        userEmail={user?.email || undefined}
+        userName={user?.displayName || undefined}
+        userId={user?.uid || undefined}
+        communityIssues={communityIssues}
+        onVoteIssue={async (issueId, voteType, voterId) => {
+          const res = await repository.voteIssue(issueId, voteType, voterId);
+          setCommunityIssues(repository.getCommunityIssues());
+          return res;
+        }}
+        onSubmitReport={async (report) => {
+          await repository.saveIssueReport(report);
+          setCommunityIssues(repository.getCommunityIssues());
         }}
         showToast={showToast}
       />

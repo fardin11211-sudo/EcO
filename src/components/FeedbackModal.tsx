@@ -730,9 +730,36 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
               {/* List of Community Issues */}
               <div className="space-y-3">
-                {filteredCommunityIssues.length === 0 ? (
+                {communityIssues.length === 0 ? (
+                  <div className="py-12 px-6 text-center rounded-2xl bg-[#0C0E12] border border-[#73E3B4]/30 space-y-3.5 shadow-sm">
+                    <div className="w-14 h-14 rounded-2xl bg-[#73E3B4]/15 border border-[#73E3B4]/40 flex items-center justify-center text-[#73E3B4] mx-auto shadow-md shadow-[#73E3B4]/10">
+                      <CheckCircle2 className="w-7 h-7 stroke-[2.2]" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-2xl font-bold font-mono text-[#73E3B4] tracking-tight uppercase">
+                        None
+                      </h3>
+                      <p className="text-xs font-semibold text-[#E2E2E8]">
+                        No issues reported — The app is working perfectly!
+                      </p>
+                      <p className="text-[11px] text-[#87948C] max-w-sm mx-auto leading-relaxed">
+                        There are currently zero open problems or complaints. If you ever experience a bug or have a suggestion, feel free to report it.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('submit')}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E2024] hover:bg-[#282A2E] border border-[#73E3B4]/40 text-[#73E3B4] text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>Submit an Issue or Suggestion</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : filteredCommunityIssues.length === 0 ? (
                   <div className="p-10 text-center text-xs text-[#87948C] bg-[#0C0E12] rounded-xl border border-[#3D4943]/30 space-y-2">
-                    <div>No community issues found matching your criteria.</div>
+                    <div>No issues match your search or filter.</div>
                     <button
                       type="button"
                       onClick={() => {
@@ -891,16 +918,18 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               </div>
 
               {/* Quick CTA to submit a new problem */}
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('submit')}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E2024] hover:bg-[#282A2E] border border-[#73E3B4]/40 text-[#73E3B4] text-xs font-semibold transition-all cursor-pointer shadow-sm"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Have an issue or idea? Submit a New Issue</span>
-                </button>
-              </div>
+              {communityIssues.length > 0 && (
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('submit')}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E2024] hover:bg-[#282A2E] border border-[#73E3B4]/40 text-[#73E3B4] text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>Have an issue or idea? Submit a New Issue</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

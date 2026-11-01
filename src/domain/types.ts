@@ -230,6 +230,8 @@ export interface IssueReport {
   dislikesCount?: number;
   likedBy?: string[];
   dislikedBy?: string[];
+  screenshot?: string;
   createdAt: number;
 }
+
 

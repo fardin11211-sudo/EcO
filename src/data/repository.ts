@@ -37,54 +37,6 @@ import {
   where
 } from 'firebase/firestore';
 
-export const DEFAULT_COMMUNITY_ISSUES: IssueReport[] = [
-  {
-    id: 'issue_seed_1',
-    userId: 'user_community_seed_1',
-    userName: 'Tanvir Hossain',
-    title: 'bKash cash-out fee rate needs per-transaction override',
-    type: 'idea',
-    message: 'When cashing out from merchant vs agent, fee varies between 1.49% to 1.85%. An optional custom rate slider per transfer would make it 100% accurate.',
-    page: 'Wallets',
-    status: 'seen',
-    likesCount: 18,
-    dislikesCount: 1,
-    likedBy: [],
-    dislikedBy: [],
-    createdAt: Date.now() - 86400000 * 2
-  },
-  {
-    id: 'issue_seed_2',
-    userId: 'user_community_seed_2',
-    userName: 'Nabila Karim',
-    title: 'Monthly Category Breakdown Export in Excel / CSV',
-    type: 'idea',
-    message: 'I want to export each category total for the month (e.g. Food, Groceries, Rent) into an Excel spreadsheet or PDF for personal filing.',
-    page: 'Expenses',
-    status: 'new',
-    likesCount: 32,
-    dislikesCount: 0,
-    likedBy: [],
-    dislikedBy: [],
-    createdAt: Date.now() - 86400000 * 4
-  },
-  {
-    id: 'issue_seed_3',
-    userId: 'user_community_seed_3',
-    userName: 'Sakib Al Hasan',
-    title: 'Mobile touch target for calendar date picker on small screens',
-    type: 'bug',
-    message: 'On small screen devices, selecting dates at the bottom edge sometimes misses the tap. Making the hit area 44px would help.',
-    page: 'Home',
-    status: 'new',
-    likesCount: 11,
-    dislikesCount: 2,
-    likedBy: [],
-    dislikedBy: [],
-    createdAt: Date.now() - 86400000 * 6
-  }
-];
-
 export class HybridFirebaseRepository {
   private listeners: Set<() => void> = new Set();
   private unsubs: Unsubscribe[] = [];
@@ -914,12 +866,15 @@ export class HybridFirebaseRepository {
       const rawCommunity = localStorage.getItem('eco_community_issues');
       if (rawCommunity) {
         try {
-          this.communityIssues = JSON.parse(rawCommunity);
+          const parsed = JSON.parse(rawCommunity);
+          this.communityIssues = Array.isArray(parsed)
+            ? parsed.filter((i: any) => i && i.id && !i.id.startsWith('issue_seed_'))
+            : [];
         } catch {
-          this.communityIssues = [...DEFAULT_COMMUNITY_ISSUES];
+          this.communityIssues = [];
         }
       } else {
-        this.communityIssues = [...DEFAULT_COMMUNITY_ISSUES];
+        this.communityIssues = [];
       }
     } catch (e) {
       console.warn('[EcO Cache] Failed to load local cache:', e);
@@ -931,24 +886,23 @@ export class HybridFirebaseRepository {
     if (isFirebaseConfigured() && db) {
       try {
         const unsub = onSnapshot(collection(db, 'communityIssues'), (snapshot) => {
-          if (!snapshot.empty) {
-            const list: IssueReport[] = [];
-            snapshot.forEach((docSnap) => {
-              const data = docSnap.data() as IssueReport;
-              list.push({
-                ...data,
-                id: docSnap.id,
-                likesCount: typeof data.likesCount === 'number' ? data.likesCount : (data.likedBy?.length || 0),
-                dislikesCount: typeof data.dislikesCount === 'number' ? data.dislikesCount : (data.dislikedBy?.length || 0),
-                likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
-                dislikedBy: Array.isArray(data.dislikedBy) ? data.dislikedBy : []
-              });
+          const list: IssueReport[] = [];
+          snapshot.forEach((docSnap) => {
+            if (docSnap.id.startsWith('issue_seed_')) return;
+            const data = docSnap.data() as IssueReport;
+            list.push({
+              ...data,
+              id: docSnap.id,
+              likesCount: typeof data.likesCount === 'number' ? data.likesCount : (data.likedBy?.length || 0),
+              dislikesCount: typeof data.dislikesCount === 'number' ? data.dislikesCount : (data.dislikedBy?.length || 0),
+              likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
+              dislikedBy: Array.isArray(data.dislikedBy) ? data.dislikedBy : []
             });
-            list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-            this.communityIssues = list;
-            localStorage.setItem('eco_community_issues', JSON.stringify(list));
-            this.notify();
-          }
+          });
+          list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          this.communityIssues = list;
+          localStorage.setItem('eco_community_issues', JSON.stringify(list));
+          this.notify();
         }, (err) => {
           console.warn('Community issues snapshot note:', err);
         });
@@ -1891,15 +1845,16 @@ export class HybridFirebaseRepository {
       const raw = localStorage.getItem('eco_community_issues');
       if (raw) {
         try {
-          this.communityIssues = JSON.parse(raw);
+          const parsed = JSON.parse(raw);
+          this.communityIssues = Array.isArray(parsed)
+            ? parsed.filter((i: any) => i && i.id && !i.id.startsWith('issue_seed_'))
+            : [];
         } catch {
-          this.communityIssues = [...DEFAULT_COMMUNITY_ISSUES];
+          this.communityIssues = [];
         }
-      } else {
-        this.communityIssues = [...DEFAULT_COMMUNITY_ISSUES];
       }
     }
-    return [...this.communityIssues];
+    return this.communityIssues.filter((i) => i && !i.id.startsWith('issue_seed_'));
   }
 
   async saveIssueReport(report: IssueReport): Promise<void> {
